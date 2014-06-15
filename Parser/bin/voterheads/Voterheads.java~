@@ -1,0 +1,260 @@
+package voterheads;
+			
+		
+import java.io.BufferedReader;
+import java.io.BufferedWriter;	
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+
+import com.db4o.ObjectContainer;
+import com.db4o.ObjectSet;
+import com.db4o.ext.Db4oRecoverableException;
+			
+			public class Voterheads {
+			
+				/**
+				 * @param args
+				 */
+				public static void main(String[] args) {
+					// TODO Auto-generated method stub
+					OrgDownload orgDownload = new OrgDownload();
+					Organization[] orgs = orgDownload.download();
+					Organization org = orgs[0];
+					String url = org.getAgenda_url();
+					//home directory
+					String home = System.getProperty("user.home");
+					
+						try {
+							BufferedWriter writer = new BufferedWriter(new FileWriter(home+"/dev/apache-nutch-1.7/urls/seed.txt"));
+							writer.write(url);
+							writer.close();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					
+				//run nutch				
+				RunNutch runNutch = new RunNutch();
+				runNutch.runNutch();		
+				//read log fetch the segment
+				BufferedReader reader = null;
+				String input = null;
+				String segment = null;
+				try {
+					reader = new BufferedReader(new FileReader(home+"/dev/apache-nutch-1.7/log.txt"));
+						while( (input  = reader.readLine()) != null){
+							
+							if(input.contains("Fetcher: segment: ")){
+								segment = input.substring(33);						
+								break;
+							}
+								
+						}
+					reader.close();
+					System.out.println();
+					System.out.println("start crawling");
+					//write shell script
+					BufferedWriter  writer = new BufferedWriter(new FileWriter(home+"/dev/apache-nutch-1.7/saveNutchUrls.sh"));
+					String dir = "cd " + home+"/dev/apache-nutch-1.7/ \n";
+					String part1 = "bin/nutch readseg -dump crawl/segments/";
+					String part2 = "/ outputdir2 -nocontent -nofetch -nogenerate -noparse -noparsetextless outputdir2/dump > saveNutchUrls_log.txt";
+					writer.write("#!/bin/bash \n" + dir + " echo \"start save the urls\"\n" +  part1 + segment + part2 + "\n echo \"finish save the urls\"");
+					writer.close();
+					Runtime.getRuntime().exec("chmod 777 "+home+"/dev/apache-nutch-1.7/saveNutchUrls.sh");
+					//run saveNutchUrls.sh
+							
+					Runtime r = Runtime.getRuntime();
+					Process p = r.exec(home+"/dev/apache-nutch-1.7/saveNutchUrls.sh");
+					p.waitFor();
+					BufferedReader b = new BufferedReader(new InputStreamReader(p.getInputStream()));
+					String line = "";
+					while ((line = b.readLine()) != null) 
+					{
+						System.out.println(line);
+					} 
+					DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd_hh_mm_ss");
+					Calendar cal = Calendar.getInstance();
+					String updateAt = dateFormat.format(cal.getTime());
+					String nutchCrawledURLs = "baseline_ID_"+org.getId() + "_" + updateAt;
+					BufferedReader reader_url = new BufferedReader(new FileReader(home+"/dev/apache-nutch-1.7/outputdir2/dump"));
+					BufferedWriter writer_url = new BufferedWriter(new FileWriter(home+"/dev/apache-nutch-1.7/baseline/"+nutchCrawledURLs ));
+					String in = null;
+					while((in = reader_url.readLine()) != null){
+						System.out.println(in);
+						if(in.contains("http://")){
+							writer_url.write(in + "\n");						
+							
+						}
+					}
+					reader_url.close();
+					writer_url.close();
+					
+					//hashcode for the file
+					
+					//write shell script for the hashcode shell script
+					BufferedWriter  writerHashcodeShell = new BufferedWriter(new FileWriter(home+"/dev/apache-nutch-1.7/getHashcode.sh"));
+					String dirHashcode = "cd "+home+"/dev/apache-nutch-1.7/baseline/ \n";
+					String partHashcode = "md5sum ";
+					//String part2 = "/ outputdir2 -nocontent -nofetch -nogenerate -noparse -noparsetextless outputdir2/dump > saveNutchUrls_log.txt";
+					writerHashcodeShell.write("#!/bin/bash \n" + dirHashcode  +  partHashcode + nutchCrawledURLs);
+					writerHashcodeShell.close();
+					Runtime.getRuntime().exec("chmod 777 " + home + "/dev/apache-nutch-1.7/getHashcode.sh");
+					
+					//run the hashcode shell script
+					Runtime rHash = Runtime.getRuntime();
+					Process pHash = rHash.exec(home+"/dev/apache-nutch-1.7/getHashcode.sh");
+					p.waitFor();
+					BufferedReader bHash = new BufferedReader(new InputStreamReader(pHash.getInputStream()));
+					String hashcode = "";
+					hashcode = bHash.readLine();
+					//System.out.println("hashcode : " + hashcode) ;
+					
+					/*
+					while ((hashcode = bHash.readLine()) != null) 
+					{
+						System.out.println("hashcode : " + hashcode) ;
+					} 
+					
+					*/
+			
+					
+					ObjectContainer db = ObjectManager.openDb();
+					Baseline preBaseline = null;
+					
+				    List<BaselineSequence> result = db.query(BaselineSequence.class);	
+				    BaselineSequence baselineSequence = null;
+				    if(result.size() ==0){
+				    	
+				    	baselineSequence = new BaselineSequence();
+				    	baselineSequence.setLastSequenceNumber(1);
+				    	db.store(baselineSequence);
+				    	
+				    	Baseline baseline = new Baseline();
+						baseline.setId(org.getId());
+						baseline.setDescription(org.getDescription());
+						baseline.setName(org.getName());
+						baseline.setUpdate_at(updateAt);
+						baseline.setHashcode(hashcode.substring(0,hashcode.indexOf(" ")));
+						baseline.setNutchCrawledURLs(nutchCrawledURLs);
+						baseline.setSequenceNumber(baselineSequence.getLastSequenceNumber());
+						db.store(baseline);
+				    	
+				    }
+				    else{
+				    	baselineSequence = result.get(0);
+						long lastSequenceNumber = baselineSequence.getLastSequenceNumber();
+						Baseline queryObject = new Baseline();
+						queryObject.setSequenceNumber(lastSequenceNumber);
+						final ObjectSet<Baseline> res = db.queryByExample(queryObject);
+						preBaseline = res.get(0);
+						
+				    }	   
+				    
+				    ArrayList<String> differentUrls = new ArrayList<>();
+				    
+				    if(preBaseline != null && !(hashcode.substring(0,hashcode.indexOf(" ")).equals(preBaseline.getHashcode()))){
+				    	System.out.println("pre hashcode : \n" + preBaseline.getHashcode());
+					    System.out.println("cur hashcode : \n" + hashcode.substring(0,hashcode.indexOf(" ")));
+				    	differentUrls = compareNutchFile(preBaseline.getNutchCrawledURLs(), nutchCrawledURLs);//find the different urls
+				    	write(differentUrls);
+				    	baselineSequence.setLastSequenceNumber(baselineSequence.getLastSequenceNumber()+1);//increase the last sequence number
+				    	db.store(baselineSequence);
+				    	
+				    	Baseline baseline = new Baseline();
+						baseline.setId(org.getId());
+						baseline.setDescription(org.getDescription());
+						baseline.setName(org.getName());
+						baseline.setUpdate_at(updateAt);
+						baseline.setHashcode(hashcode.substring(0,hashcode.indexOf(" ")));
+						baseline.setNutchCrawledURLs(nutchCrawledURLs);
+						baseline.setSequenceNumber(baselineSequence.getLastSequenceNumber());
+						db.store(baseline);
+				    }
+				    else if(preBaseline != null && (hashcode.substring(0,hashcode.indexOf(" ")).equals(preBaseline.getHashcode())) ){
+				    	 new File(home+"/dev/apache-nutch-1.7/baseline/"+nutchCrawledURLs).delete();
+				    }  
+					
+					
+					
+					
+					db.close();
+					
+					
+					
+					
+					
+					
+				}catch(Db4oRecoverableException e) {
+					System.out.println(e.getMessage());
+				}
+				catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+					
+				}
+
+				private static void write(ArrayList<String> differentUrls) {
+					// TODO Auto-generated method stub
+					String home = System.getProperty("user.home");
+					BufferedWriter writerUrls;
+					try {
+						writerUrls = new BufferedWriter(new FileWriter(home+"/dev/apache-nutch-1.7/different.txt"));
+						for(String s : differentUrls){
+							writerUrls.write(s + "\n");
+						}
+							
+							writerUrls.close();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
+				
+				}
+
+				public static ArrayList<String> compareNutchFile(String preNutchCrawledURLs, String curNutchCrawledURLs) {
+					//home directory
+					System.out.println("find the different key : ");
+					String home = System.getProperty("user.home");
+					BufferedReader readPreUrl;
+					ArrayList<String> differentUrls = new ArrayList<>();
+					try {
+						readPreUrl = new BufferedReader(new FileReader(home+"/dev/apache-nutch-1.7/baseline/"+preNutchCrawledURLs));
+						BufferedReader readCurUrl = new BufferedReader(new FileReader(home+"/dev/apache-nutch-1.7/baseline/"+curNutchCrawledURLs));
+						String preKey = null;
+						HashMap<String, Integer> preUrlMap = new HashMap<>();
+						
+						while((preKey = readPreUrl.readLine()) != null){
+							preUrlMap.put(preKey, 1);
+						}
+						String curKey = null;
+						
+						while((curKey = readCurUrl.readLine()) != null){
+							if(!preUrlMap.containsKey(curKey)){
+								differentUrls.add(curKey);
+								System.out.println("the different key : " + curKey);
+							}
+						}
+					} catch (Exception e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}					
+					
+					return differentUrls;
+					// TODO Auto-generated method stub
+					
+					
+				}
+			
+			}

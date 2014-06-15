@@ -1,0 +1,48 @@
+<project name="Parser" basedir="." default="main">
+
+	<property name="JAVA_HOME"   value="/home/mike/glassfish3/jdk7"/>
+    <property name="src.dir"     value="src"/>
+
+    <property name="build.dir"   value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="jar.dir"     value="${user.home}/VoterheadsTest/jar"/>
+    <property name="lib.dir"	 value="lib"/>
+
+    <property name="main-class"  value="voterheads.Voterheads"/>
+
+	  <path id="classpath">
+	    <pathelement location="${build.dir}" />
+	    <fileset dir="${lib.dir}" includes="**/*.jar" />
+	  </path>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+    </target>
+
+    <target name="compile">
+        <mkdir dir="${classes.dir}"/>
+        <javac srcdir="${src.dir}" destdir="${classes.dir}">
+        	<classpath refid="classpath" />
+        </javac>
+    </target>
+
+    <target name="jar" depends="compile">
+        <mkdir dir="${jar.dir}"/>
+        <copy file="${src.dir}/log4j.properties" tofile="${classes.dir}/log4j.properties" overwrite="true" />       	
+       <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="${main-class}"/>
+            </manifest>
+        <zipgroupfileset dir="${lib.dir}" includes="**/*.jar" />
+       </jar>
+    </target>
+
+    <target name="run" depends="jar">
+        <java jar="${jar.dir}/${ant.project.name}.jar" fork="true"/>
+    </target>
+
+    <target name="clean-build" depends="clean,jar"/>
+
+    <target name="main" depends="clean,jar"/>
+
+</project>

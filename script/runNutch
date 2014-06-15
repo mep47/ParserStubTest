@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+#
+#bin/crawl urls -dir crawl1 -depth 3 -topN 50
+
+echo "started"
+pwd
+cd /home/mike/dev/apache-nutch-1.7 
+pwd
+JAVA_HOME=/usr/lib/jvm/java-7-oracle/
+echo $JAVA_HOME
+bin/nutch crawl urls -dir crawl -depth 1 -topN 2 > log.txt
+echo "done"
