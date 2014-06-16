@@ -311,6 +311,8 @@ public class Voterheads
     private static void doIndexAndParse(List<String> differentUrls,
             String folderPath, Organization org, boolean regexPresent)
     {
+    	logger.info("Starting doIndexAndParse");
+    	
         String fileExtension = "";
         FilenameUrlPair pair = null;
         String mailMessage = "";
@@ -418,6 +420,7 @@ public class Voterheads
                     "info@voterheads.com",
                     org.getState() + " - " + org.getName() + " REPORT");
         }
+        logger.info("Exiting DoIndexAndParse");
     }
 
     private static FilenameUrlPair downloadDiffPage(String urlString,
@@ -972,6 +975,8 @@ public class Voterheads
         summary.appendBody("<h3>Events Created: " + Voterheads.getEventsCreated() + "</h3>");
         summary.appendBody("</body></html>");
         MailManager.sendEmail(summary.getBody(),summary.getTo(),summary.getFrom(),summary.getSubject());
+        
+        logger.info("====== Finished ========");
 
     }
 

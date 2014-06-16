@@ -66,6 +66,7 @@ public class Extractor
 
     private class MyPDFTextStripper extends PDFTextStripper
     {
+
         private final String  FOOTER_DATE           = "^(January|February|March|April|May|June|July|August|September|October|November|December)\\b";
         private final Pattern footerDatePat         = Pattern
                                                             .compile(FOOTER_DATE);
@@ -580,13 +581,17 @@ public class Extractor
 
     public static void main(String[] args)
     {
+		
+	    final String home = System.getProperty("user.home");
+
+        BufferedWriter out = null;
+        String topicsFileString = home+"/VoterheadsTest/Topics/Topics.txt";
+
         Extractor extractor;
         Event event;
 
         final Organization org = new Organization();
         org.setId("1111");
-
-        final String home = System.getProperty("user.home");
 
         extractor = new Extractor();
 
@@ -597,15 +602,35 @@ public class Extractor
 
         event = extractor.extractAllSections();
 
-        for (final Topic top : event.getTopics())
+        try {
+			out = new BufferedWriter(new FileWriter( new File(topicsFileString)));
+	        for (final Topic top : event.getTopics())
+	        {
+	            out.write("\n" + top + "\n");
+	        }
+	        out.flush();
+		} catch (IOException e) {
+			logger.error(e, e);
+		}
+        finally
         {
-            System.out.println("\n" + top);
+        	try {
+				out.close();
+			} catch (IOException e) {
+				logger.error(e, e);
+			}
         }
     }
 
     public static void performExtractionParse(FilenameUrlPair pair,
             Organization org, QueryResult queryResult, String statusString)
     {
+		
+	    final String home = System.getProperty("user.home");
+
+        BufferedWriter out = null;
+        String topicsFileString = home+"/VoterheadsTest/Topics/Topics.txt";
+
         final Extractor extractor = new Extractor();
 
         extractor.pdfBoxParse(pair.getFilename(), org.getId());
@@ -624,6 +649,27 @@ public class Extractor
                     + " topics created");
             return;
         }
+
+        logger.info("write Topics.txt file");
+        try {
+			out = new BufferedWriter(new FileWriter( new File(topicsFileString)));
+	        for (final Topic top : event.getTopics())
+	        {
+	            out.write("\n" + top + "\n");
+	        }
+	        out.flush();
+		} catch (IOException e) {
+			logger.error(e, e);
+		}
+        finally
+        {
+        	try {
+				out.close();
+			} catch (IOException e) {
+				logger.error(e, e);
+			}
+        }
+
         // logger.info("In performExtraction Parse SENDJSON: " +
         // props.getProperty("sendJSON"));
         if (props.getProperty("sendJSON").equalsIgnoreCase("True"))
@@ -634,10 +680,6 @@ public class Extractor
         else
         {
             // logger.info("got to properties sendJSON false");
-        }
-        for (final Topic top : event.getTopics())
-        {
-            System.out.println("\n" + top);
         }
 
     }
@@ -1675,6 +1717,8 @@ public class Extractor
 	        {
 		        response.append (str + "\n");
 	        }
+	        
+	        logger.info("Response Received from JSON Post ="+response);
 
         }
         catch(Exception e)
