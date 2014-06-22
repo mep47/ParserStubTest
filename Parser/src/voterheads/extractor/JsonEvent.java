@@ -1,7 +1,5 @@
 package voterheads.extractor;
 
-import voterheads.Voterheads;
-
 public class JsonEvent
 {
 
@@ -10,11 +8,6 @@ public class JsonEvent
     String start_time;
     String title;
     String organization_ids;
-
-    public JsonEvent()
-    {
-        
-    }
 
     public String getDescription()
     {

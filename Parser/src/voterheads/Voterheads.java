@@ -25,17 +25,17 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import org.apache.commons.cli.CommandLine;
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
 
+import voterheads.extractor.Event;
 import voterheads.extractor.Extractor;
+import voterheads.extractor.Topic;
 import voterheads.index.Indexer;
 import voterheads.index.QueryResult;
 import voterheads.mail.MailManager;
-import voterheads.mail.Mail;
 import voterheads.webcrawler.WebCrawler;
 import biz.source_code.base64Coder.Base64Coder;
 
@@ -53,47 +53,16 @@ import com.db4o.ObjectSet;
 @SuppressWarnings("deprecation")
 public class Voterheads
 {
-    private static MandrillRESTRequest request = new MandrillRESTRequest();
-    private static MandrillConfiguration config = new MandrillConfiguration();
+
+    private static MandrillRESTRequest     request         = new MandrillRESTRequest();
+    private static MandrillConfiguration   config          = new MandrillConfiguration();
     private static MandrillMessagesRequest messagesRequest = new MandrillMessagesRequest();
-    private static HttpClient client;
-    private static ObjectMapper mapper = new ObjectMapper();
-    private static Properties props = new Properties();
-    private static Logger logger = Logger.getLogger(Voterheads.class);
-    private static boolean isLiveStatus;
-    private static boolean isReportOnlyStatus;
-    private static int eventsCreated = 0;
-    private static int emailsSent = 0;
-
-    public static int getEmailsSent ()
-    {
-        return Voterheads.emailsSent;
-    }
-
-    public static void setEmailsSent (int emailsSent)
-    {
-        Voterheads.emailsSent = emailsSent;
-    }
-
-    public static void incrementEmailsSent ()
-    {
-        Voterheads.emailsSent = Voterheads.getEmailsSent() + 1;
-    }
-
-    public static int getEventsCreated ()
-    {
-        return Voterheads.eventsCreated;
-    }
-
-    public static void setEventsCreated (int eventsCreated)
-    {
-        Voterheads.eventsCreated = eventsCreated;
-    }
-
-    public static void incrementEventsCreated ()
-    {
-        Voterheads.eventsCreated = Voterheads.getEventsCreated() + 1;
-    }
+    private static HttpClient              client;
+    private static ObjectMapper            mapper          = new ObjectMapper();
+    public  static Properties              props           = new Properties();
+    private static Logger                  logger          = Logger.getLogger(Voterheads.class);
+    private static boolean                 isLiveStatus;
+    private static boolean                 isReportOnlyStatus;
 
     public static String calculateHashcode(String folderPath,
             String nutchCrawledURLs)
@@ -159,7 +128,7 @@ public class Voterheads
     private static void checkNumDiff(long lastSequenceNumber,
             String folderPath, ArrayList<String> differentUrls, Organization org)
     {
-        // SEND ALERT is not functioning properly so those lines have been
+        // SEND ALERT is not functioning propertly so those lines have been
         // commented
         ObjectContainer db = null;
         try
@@ -300,6 +269,8 @@ public class Voterheads
             }
             catch (final IOException e)
             {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
                 logger.fatal(e.getMessage(), e);
             }
         }
@@ -311,31 +282,27 @@ public class Voterheads
     private static void doIndexAndParse(List<String> differentUrls,
             String folderPath, Organization org, boolean regexPresent)
     {
-    	logger.info("Starting doIndexAndParse");
-    	
         String fileExtension = "";
         FilenameUrlPair pair = null;
         String mailMessage = "";
+        QueryResult queryResult = null;
+        String statusString = null;
+
+        logger.info("Starting method doIndexAndParse");
+        
+        Event event = null;
         // Build Message Header for urls with no agenda file format
         mailMessage += "<html><body>";
-        mailMessage += "<h1>" + org.getState() + " - " + org.getName()
-                + "</h1>";
+        mailMessage += "<h1>" + org.getName() + "</h1>";
         mailMessage += "<h2>" + differentUrls.size() + " NEW URLs";
 
         for (String urlString : differentUrls)
         {
-            // urlString.lastIndexOf("/") yeilds a file name that starts with a
-            // "/" the + 1 is there to jump to the character after the / as the
-            // start of the string
-            mailMessage += "<h3><a href=\"" + urlString + "\">"
-                    + urlString.substring(urlString.lastIndexOf("/") + 1)
-                    + "</a></h3>";
             pair = downloadDiffPage(urlString, folderPath);
             if (pair == null)
             {
                 continue;
             }
-            String statusString = null;
             if (isLiveStatus)
             {
                 statusString = "LIVE";
@@ -347,12 +314,14 @@ public class Voterheads
             logger.info("File Extension: "
                     + Indexer.getFileExtension(urlString));
             Indexer.createIndex(pair, folderPath);
-            QueryResult queryResult = null;
-            if (!org.getKeyWords().equals(""))
-            {
-                queryResult = Indexer.keyWordQuery(folderPath,
-                        org.getKeyWords());
-            }
+            queryResult = Indexer.keyWordQuery(folderPath,
+                    org.getKeyWords());
+            // urlString.lastIndexOf("/") yeilds a file name that starts with a
+            // "/" the + 1 is there to jump to the character after the / as the
+            // start of the string
+            mailMessage += "<h3><a href=\"" + urlString + "\">"
+                    + urlString.substring(urlString.lastIndexOf("/") + 1)
+                    + "</a></h3>";
             try
             {
                 mailMessage += "<p>" + queryResult.getQueryResult() + "</p>";
@@ -417,10 +386,48 @@ public class Voterheads
         {
             MailManager.sendEmail(mailMessage,
                     props.getProperty("differenceEmailAddresses"),
-                    "info@voterheads.com",
-                    org.getState() + " - " + org.getName() + " REPORT");
+                    "info@voterheads.com", org.getName() + " REPORT");
         }
-        logger.info("Exiting DoIndexAndParse");
+
+//  Stuff for testing
+//        event = Extractor.performExtractionParse(pair, org,
+//                queryResult, statusString);
+//        
+//        if(props.getProperty("production").equals("false") )
+//        {
+//        	StringBuffer strbuf = new StringBuffer(2000);
+//            for (final Topic top : event.getTopics())
+//            {
+//                strbuf.append(top);
+//            }
+//
+//            final String home = System.getProperty("user.home");
+//            String jsonTestResultFilename = home+"/VoterheadsTest/TestOutput/testResult.txt";
+//            BufferedWriter out = null;            try
+//            {
+//            	out = new BufferedWriter(new FileWriter( new File(jsonTestResultFilename)));
+//            	out.write(strbuf.toString());
+//            }
+//            catch(Exception e)
+//            {
+//            	e.printStackTrace();
+//            }
+//            finally
+//            {
+//            	if(out != null)
+//            	{
+//            		try {
+//    					out.close();
+//    				} catch (IOException e) {
+//    					// TODO Auto-generated catch block
+//    					e.printStackTrace();
+//    				}
+//            	}
+//            }
+//
+//
+//        }
+
     }
 
     private static FilenameUrlPair downloadDiffPage(String urlString,
@@ -466,6 +473,7 @@ public class Voterheads
                 // prepend doctype
             }
 
+//            while ((inputLength = in.read(inputLine)) != -1)
             while ((inputLength = in.read(inputLine)) != -1)
             {
                 out.write(inputLine, 0, inputLength);
@@ -608,35 +616,19 @@ public class Voterheads
      */
     public static void main(String[] args)
     {
-        final DateFormat dateFormat = new SimpleDateFormat(
-            "yyyy_MM_dd_hh_mm_ss");
-        final Calendar calendar;
-        calendar = Calendar.getInstance();
-        String startTime = dateFormat.format(calendar.getTime());
         InputStream input = null;
         final String home = System.getProperty("user.home");
-        Mail summary = new Mail();
         readPropertiesFile(input, home);
-
-        summary.setFrom("info@voterheads.com");
-        summary.setTo(props.getProperty("differenceEmailAddresses"));
-        summary.setSubject("Backend Summary for " +  startTime);
-        summary.setBody("<html><body><h1>Summary for " + startTime + " run</h1>");
 
         // Properties file must be read before it can be queried
         final Set<String> runSet = getPropertiesSet("run");
         final Set<String> skipSet = getPropertiesSet("skip");
 
-//        processArgs(args, runSet, skipSet);
-        
-        CLArguments.initialize(args);
-        
-        CLArguments.getMultiValueArg(CLArguments.RUN, runSet);
-        CLArguments.getMultiValueArg(CLArguments.SKIP, skipSet);
+        processArgs(args, runSet, skipSet);
 
         logger.info("Run Organizations: " + runSet.toString());
         logger.info("Skip Organizations: " + skipSet.toString());
-        
+
         final OrgDownload orgDownload = new OrgDownload();
         final ArrayList<Organization> orgs = orgDownload.download();
         ArrayList<String> agendaUrls = null;
@@ -651,6 +643,7 @@ public class Voterheads
 
         for (final Organization org : orgs)
         {
+        	logger.info("org="+org);
             final boolean regexPresent = (org.getAgenda_file_format() != null)
                     && !org.getAgenda_file_format().equals("");
             replaceAgendaDates(org, regexPresent, 0);
@@ -719,8 +712,10 @@ public class Voterheads
 
                 new File(folderPath + "/baseline").mkdir();
 
-
-                updateAt = dateFormat.format(calendar.getTime());
+                final DateFormat dateFormat = new SimpleDateFormat(
+                        "yyyy_MM_dd_hh_mm_ss");
+                final Calendar cal = Calendar.getInstance();
+                updateAt = dateFormat.format(cal.getTime());
 
                 baselineFilename = "WC_baseline_ID_" + org.getId() + "_"
                         + updateAt;
@@ -811,9 +806,6 @@ public class Voterheads
                         String baselineUrl = null;
                         while ((baselineUrl = readCurrentBaseline.readLine()) != null)
                         {
-
-                            baselineUrl = truncateLink(baselineUrl);
-
                             differentUrls.add(baselineUrl);
                         }
                         readCurrentBaseline.close();
@@ -970,14 +962,6 @@ public class Voterheads
                 System.exit(0);
             }
         }
-
-        summary.appendBody("<h3>Emails Sent: " + Voterheads.getEmailsSent() + "</h3>");
-        summary.appendBody("<h3>Events Created: " + Voterheads.getEventsCreated() + "</h3>");
-        summary.appendBody("</body></html>");
-        MailManager.sendEmail(summary.getBody(),summary.getTo(),summary.getFrom(),summary.getSubject());
-        
-        logger.info("====== Finished ========");
-
     }
 
     private static void processArgs(String[] args, final Set<String> runSet,
@@ -1018,6 +1002,8 @@ public class Voterheads
 
             logger.info("PRODUCTION: " + props.getProperty("production"));
             logger.info("SENDJSON: " + props.getProperty("sendJSON"));
+            logger.info("SENDJSONLINK: " + props.getProperty("sendJSONLink"));
+            logger.info("ORGANIZATIONJASONLINK: " + props.getProperty("organizationJSONLink"));
             logger.info("DIFFERENCEEMAILADDRESSES: "
                     + props.getProperty("differenceEmailAddresses"));
 
@@ -1285,42 +1271,6 @@ public class Voterheads
         }
 
         return fileName;
-    }
-
-    private static String truncateLink(String url)
-    {
-        String currentExtension = null;
-        if(url.contains(".pdf"))
-        {
-            currentExtension = ".pdf";
-        }
-        else if (url.contains(".html"))
-        {
-            currentExtension = ".html";
-        }
-        else if (url.contains("htm"))
-        {
-            currentExtension = ".htm";
-        }
-        else if (url.contains(".doc"))
-        {
-            currentExtension = ".doc";
-        }
-        else if (url.contains("rtf"))
-        {
-            currentExtension = ".rtf";
-        }
-        else if (url.contains(".docx"))
-        {
-            currentExtension = ".docx";
-        }
-
-        if(url.lastIndexOf(currentExtension) < url.length()-currentExtension.length())
-        {
-            url = url.substring(0,url.lastIndexOf(currentExtension) + currentExtension.length());
-            logger.info("text after extension " + url);
-        }
-        return url;
     }
 
     /*

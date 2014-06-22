@@ -14,7 +14,8 @@ public class OrgDownload
 {
 
 //    private static final String organizationJSONLink = "https://www.voterheads.com/organizations.json";
-    private static final String organizationJSONLink = CLArguments.getArgValue(CLArguments.ORG_URL);
+//    private static final String organizationJSONLink = "http://127.0.0.1:9990";
+    private static final String organizationJSONLink = Voterheads.props.getProperty("organizationJSONLink");
     private static final Logger logger               = Logger.getLogger(OrgDownload.class);
 
     /**
@@ -40,7 +41,6 @@ public class OrgDownload
 
         try
         {
-        	logger.info("Connecting to "+organizationJSONLink);
             voterheads = new URL(organizationJSONLink);
             final URLConnection vh = voterheads.openConnection();
             vh.setReadTimeout(30000);

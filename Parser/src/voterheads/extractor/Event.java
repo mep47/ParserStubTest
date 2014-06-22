@@ -1,7 +1,5 @@
 package voterheads.extractor;
 
-import voterheads.Voterheads;
-
 import java.util.ArrayList;
 import java.util.List;
 

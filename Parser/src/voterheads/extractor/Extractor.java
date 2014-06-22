@@ -2,7 +2,9 @@ package voterheads.extractor;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -10,6 +12,7 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -52,7 +55,6 @@ import org.apache.pdfbox.util.PDFTextStripper;
 import org.apache.pdfbox.util.PositionWrapper;
 import org.apache.pdfbox.util.TextPosition;
 
-import voterheads.CLArguments;
 import voterheads.FilenameUrlPair;
 import voterheads.Organization;
 import voterheads.Voterheads;
@@ -66,7 +68,6 @@ public class Extractor
 
     private class MyPDFTextStripper extends PDFTextStripper
     {
-
         private final String  FOOTER_DATE           = "^(January|February|March|April|May|June|July|August|September|October|November|December)\\b";
         private final Pattern footerDatePat         = Pattern
                                                             .compile(FOOTER_DATE);
@@ -458,7 +459,10 @@ public class Extractor
 
                                     numberStr = m.group();
                                     pageNumber = Integer.parseInt(numberStr);
-                                    ;
+
+                                    System.out
+                                            .println("processTextPosition lastPageToProcess = "
+                                                    + lastPageToProcess);
                                     if (pageNumber == lastPageToProcess)
                                     {
                                         terminateDocument = true;
@@ -581,17 +585,13 @@ public class Extractor
 
     public static void main(String[] args)
     {
-		
-	    final String home = System.getProperty("user.home");
-
-        BufferedWriter out = null;
-        String topicsFileString = home+"/VoterheadsTest/Topics/Topics.txt";
-
         Extractor extractor;
         Event event;
 
         final Organization org = new Organization();
         org.setId("1111");
+
+        final String home = System.getProperty("user.home");
 
         extractor = new Extractor();
 
@@ -602,35 +602,16 @@ public class Extractor
 
         event = extractor.extractAllSections();
 
-        try {
-			out = new BufferedWriter(new FileWriter( new File(topicsFileString)));
-	        for (final Topic top : event.getTopics())
-	        {
-	            out.write("\n" + top + "\n");
-	        }
-	        out.flush();
-		} catch (IOException e) {
-			logger.error(e, e);
-		}
-        finally
+        for (final Topic top : event.getTopics())
         {
-        	try {
-				out.close();
-			} catch (IOException e) {
-				logger.error(e, e);
-			}
+            System.out.println("\n" + top);
         }
     }
 
-    public static void performExtractionParse(FilenameUrlPair pair,
+    public static Event performExtractionParse(FilenameUrlPair pair,
             Organization org, QueryResult queryResult, String statusString)
     {
-		
-	    final String home = System.getProperty("user.home");
-
-        BufferedWriter out = null;
-        String topicsFileString = home+"/VoterheadsTest/Topics/Topics.txt";
-
+    	logger.info("Starting method performExtractionParse");
         final Extractor extractor = new Extractor();
 
         extractor.pdfBoxParse(pair.getFilename(), org.getId());
@@ -647,29 +628,8 @@ public class Extractor
         {
             logger.warn("Topic limit hit: " + event.getTopics().size()
                     + " topics created");
-            return;
+            return event;
         }
-
-        logger.info("write Topics.txt file");
-        try {
-			out = new BufferedWriter(new FileWriter( new File(topicsFileString)));
-	        for (final Topic top : event.getTopics())
-	        {
-	            out.write("\n" + top + "\n");
-	        }
-	        out.flush();
-		} catch (IOException e) {
-			logger.error(e, e);
-		}
-        finally
-        {
-        	try {
-				out.close();
-			} catch (IOException e) {
-				logger.error(e, e);
-			}
-        }
-
         // logger.info("In performExtraction Parse SENDJSON: " +
         // props.getProperty("sendJSON"));
         if (props.getProperty("sendJSON").equalsIgnoreCase("True"))
@@ -681,7 +641,12 @@ public class Extractor
         {
             // logger.info("got to properties sendJSON false");
         }
+        for (final Topic top : event.getTopics())
+        {
+            System.out.println("\n" + top);
+        }
 
+        return event;
     }
 
     String                  orgId;
@@ -1040,7 +1005,7 @@ public class Extractor
 
         Matcher matcher = null;
 
-        if (ln.getTextStartX().x > 150)
+        if (ln.getTextStartX().x > 300)
         {
             return ordType;
         }
@@ -1600,27 +1565,15 @@ public class Extractor
         }
 
     }
-
-    public void SendJSON(String url, QueryResult queryResult,
+    
+    public String createJSON(String url, QueryResult queryResult,
             String statusString)
     {
-    	String sendJSONUrlString = CLArguments.getArgValue(CLArguments.RETURN_URL);
         final StringBuffer jsonString = new StringBuffer(300);
         System.out.println("SendJSON");
         final Gson gson = new Gson();
 
         final JsonEvent jsonEvent = new JsonEvent();
-        
-        //Variables used by JSON result transmit code
-        OutputStream os = null;
-        BufferedReader input = null;
-        byte[] bytes = null;
-        String type = null;
-        URL u = null;
-        HttpURLConnection conn   ;
-        StringBuffer response = null;
-        String str = null;
-        
         if (queryResult == null)
         {
             jsonEvent.setDescription("<No Description>");
@@ -1694,53 +1647,138 @@ public class Extractor
 
         // jsonString.append(secondTopic);
         jsonString.append("]}");
+        
+        return jsonString.toString();
+    }
 
+    public void SendJSON(String url, QueryResult queryResult,
+            String statusString)
+    {
+        final StringBuffer jsonString = new StringBuffer(300);
+        logger.info("Startig method SendJSON");
+        final Gson gson = new Gson();
+
+        final JsonEvent jsonEvent = new JsonEvent();
+        if (queryResult == null)
+        {
+            jsonEvent.setDescription("<No Description>");
+            jsonEvent.setTitle("<No Title>");
+        }
+        else
+        {
+            jsonEvent.setDescription(queryResult.getQueryResult());
+            jsonEvent.setTitle(statusString + " hit count "
+                    + queryResult.getHitCount());
+        }
+        if (props.getProperty("production").equalsIgnoreCase("Testing"))
+        {
+            jsonEvent.setTitle(jsonEvent.getTitle() + "::TEST");
+
+        }
+        else if (props.getProperty("production").equalsIgnoreCase("Staging"))
+        {
+            jsonEvent.setTitle(jsonEvent.getTitle() + "::STAGE");
+        }
+        jsonEvent.setDoc_link(url);
+        jsonEvent.setStart_time(startTime);
+        jsonEvent.setOrganization_ids(orgId);
+
+        // String json = gson.toJson(event);
+        jsonString.append("{\"event\": ");
+        jsonString.append(gson.toJson(jsonEvent));
+        final int topicCount = event.getTopics().size();
+        // int topicCount = 2;
+        jsonString.append(",\"topic_count\":\"" + topicCount
+                + "\",\"topics\": [");
+
+        // jsonString.append(twoTopics);
+        // Topic topic = event.getTopics().get(0);
+        int i = 0;
+        for (final Topic t : event.getTopics())
+        {
+            i = i + 1;
+            final JsonTopic jsonTopic = new JsonTopic();
+
+            jsonTopic.setOrder(Integer.toString(t.getOrder()));
+            jsonTopic.setName(t.getName());
+            if (t.getDescription() == null)
+            {
+                topic.setDescription("");
+            }
+            jsonTopic.setDescription(t.getDescription());
+            // jsonTopic.setDescription("test");
+            jsonTopic.setTopic_type("Non-Voteable");
+            jsonTopic.setEntity_ordinal(t.getEntityOrdinal());
+            if (t.parentOrderNumber == 0)
+            {
+                jsonTopic.setParent(null);
+            }
+            else
+            {
+                jsonTopic.setParent(Integer.toString(t.parentOrderNumber));
+            }
+            jsonString.append(gson.toJson(jsonTopic));
+            if (i < topicCount)
+            // if(i < 2)
+            {
+                jsonString.append(",");
+            }
+            //
+            // if(i == 2)
+            // {
+            // break;
+            // }
+        }
+
+        // jsonString.append(secondTopic);
+        jsonString.append("]}");
+        
         try
         {
-        	logger.info("Sending JSON Results to "+sendJSONUrlString);
-        	
-	        bytes = jsonString.toString().getBytes();
-	        type = "application/x-www-form-urlencoded";
-	        u = new URL(sendJSONUrlString);
-	        conn = (HttpURLConnection) u.openConnection();
+        	logger.info("sending test data to Test Server");
+	        String rawData = "This is raw data";
+	        byte[] bytes = jsonString.toString().getBytes();
+	        String type = "application/x-www-form-urlencoded";
+	//        String encodedData = URLEncoder.encode( rawData ); 
+	        URL u = new URL("http://127.0.0.1:9999");
+	        HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+//	        URLConnection conn = (URLConnection) u.openConnection();
 	        conn.setDoOutput(true);
 	        conn.setRequestMethod("POST");
 	        conn.setRequestProperty( "Content-Type", type );
+	//        conn.setRequestProperty( "Content-Length", String.valueOf(encodedData.length()));
 	        conn.setRequestProperty( "Content-Length", String.valueOf(bytes.length));
-	        os = conn.getOutputStream();
+	       OutputStream os = conn.getOutputStream();
+	//        os.write(encodedData.getBytes());
 	        os.write(bytes);
 	        os.flush();
-
-	        response = new StringBuffer(1000);
-	        input = new BufferedReader(new InputStreamReader(conn.getInputStream ()));
+	        os.close();
+	        
+	        StringBuffer textArea = new StringBuffer(1000);
+	        BufferedReader input = new BufferedReader(new InputStreamReader(conn.getInputStream ()));
+	        String str;
 	        while (null != ((str = input.readLine())))
 	        {
-		        response.append (str + "\n");
+		        logger.info (str);
+		        textArea.append (str + "\n");
 	        }
-	        
-	        logger.info("Response Received from JSON Post ="+response);
-
+	        input.close ();
         }
         catch(Exception e)
         {
-        	logger.error(e, e);
+        	logger.info(e);
         }
-        finally
-        {
-	        try {
-				os.close();
-		        input.close ();
-			} catch (IOException e) {
-				logger.error(e, e);
-			}
-        }
-
+        
+//
 //        String content = null;
 //
 //        HttpResponse response = null;
 //
 //        final HttpClient httpClient = new DefaultHttpClient();
-//        final HttpPost httpPost = new HttpPost(sendJSONUrlString);
+////        final HttpPost httpPost = new HttpPost(
+////                "http://api.voterheads.com/v1/events/");
+//        final HttpPost httpPost = new HttpPost(Voterheads.props.getProperty("sendJSONLink"));
+//        
 //        // Request parameters and other properties.
 //        // List<NameValuePair> params = new ArrayList<NameValuePair>();
 //        // params.add(new BasicNameValuePair("Content-Type",
@@ -1767,6 +1805,8 @@ public class Extractor
 //            // writing error to Log
 //            e.printStackTrace();
 //        }
+//        logger.info("JSON result to send is: "+jsonString);
+//        logger.info("Sending JSON result to: "+Voterheads.props.getProperty("sendJSONLink"));
 //        // Send the JSON string to the client
 //        try
 //        {
@@ -1801,9 +1841,7 @@ public class Extractor
 //                e.printStackTrace();
 //            }
 //        }
-//        System.out.println(jsonString);
-//        System.out.println("JSON response: " + content);
-
+//        logger.info("JSON response: " + content);
     }
 
     private int skipBlankLines(int startIndex)

@@ -55,7 +55,6 @@ import org.apache.tika.sax.BodyContentHandler;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
-import voterheads.CLArguments;
 import voterheads.FilenameUrlPair;
 import voterheads.Voterheads;
 import voterheads.extractor.JsonEvent;
@@ -67,8 +66,6 @@ public class Indexer
     private static final String cannotProcessHTML = "We apologize for the inconvenience, at this time we are unable to process this document.";
 
     private static final Logger logger            = Logger.getLogger(Indexer.class);
-
-    private static final int MAXFRAGMENTS = 10;
 
     public static void createIndex(FilenameUrlPair pair, String folderPath)
     {
@@ -137,15 +134,15 @@ public class Indexer
         }
         catch (final IOException e)
         {
-            logger.error(e.getStackTrace());
+            e.printStackTrace();
         }
         catch (final TikaException e)
         {
-        	logger.error(e.getStackTrace());
+            e.printStackTrace();
         }
         catch (final SAXException e)
         {
-        	logger.error(e.getStackTrace());
+            e.printStackTrace();
         }
         finally
         {
@@ -300,7 +297,6 @@ public class Indexer
     public static QueryResult keyWordQuery(String folderPath, String keyWords)
     {
 
-
         final File indexDir = new File(folderPath + "/index");
         StringBuffer queryResults = new StringBuffer(500);
 
@@ -320,7 +316,6 @@ public class Indexer
             query = new QueryParser(Version.LUCENE_47, "content",
                     new StandardAnalyzer(Version.LUCENE_47)).parse(keyWords);
 
-
             final IndexReader reader = DirectoryReader.open(FSDirectory
                     .open(indexDir));
             final IndexSearcher searcher = new IndexSearcher(reader);
@@ -337,6 +332,7 @@ public class Indexer
             final SimpleFragmenter fragmenter = new SimpleFragmenter();
             fragmenter.setFragmentSize(200);
             highlighter.setTextFragmenter(fragmenter);
+
             for (final ScoreDoc hit : hits)
             {
                 final int id = hit.doc;
@@ -361,7 +357,7 @@ public class Indexer
                 final TokenStream tokenStream = TokenSources.getAnyTokenStream(
                         searcher.getIndexReader(), id, "content", analyzer);
                 final TextFragment[] frag = highlighter.getBestTextFragments(
-                        tokenStream, text, false, MAXFRAGMENTS);
+                        tokenStream, text, false, 4);
                 totalHits = frag.length;
                 logger.info("");
                 for (final TextFragment element : frag)
@@ -383,16 +379,16 @@ public class Indexer
         }
         catch (final IOException e)
         {
-        	logger.error(e.getStackTrace());
+            e.printStackTrace();
         }
         catch (final InvalidTokenOffsetsException e)
         {
             // TODO Auto-generated catch block
-        	logger.error(e.getStackTrace());
+            e.printStackTrace();
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-        	logger.error(ex.getStackTrace());
+        	logger.error(e.getStackTrace());
         }
 
         // List<String> noMatchUrls = new ArrayList<String>();
@@ -518,7 +514,6 @@ public class Indexer
                 "MM-dd-yyyy HH:mm Z");
         final String startTime = format1.format(date);
 
-    	String sendJSONUrlString = CLArguments.getArgValue(CLArguments.RETURN_URL);
         String content = null;
         HttpResponse response = null;
 
@@ -553,7 +548,9 @@ public class Indexer
         // jsonString.append(",\"topic_count\":\""+topicCount+"\"}");
 
         final HttpClient httpClient = new DefaultHttpClient();
-        final HttpPost httpPost = new HttpPost(sendJSONUrlString);
+//        final HttpPost httpPost = new HttpPost(
+//                "http://api.voterheads.com/v1/events/");
+        final HttpPost httpPost = new HttpPost(Voterheads.props.getProperty("sendJSONLink"));
 
         httpPost.addHeader("Content-Type", "application/json");
         httpPost.addHeader("token", "583d42b69ae461f6e65a3577059ba06a");
@@ -573,8 +570,6 @@ public class Indexer
         // Send the JSON string to the client
         try
         {
-            //New event created so increment total events created
-            Voterheads.incrementEventsCreated();
             response = httpClient.execute(httpPost);
             final HttpEntity respEntity = response.getEntity();
 

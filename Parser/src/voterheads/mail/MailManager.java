@@ -18,7 +18,6 @@ import com.cribbstechnologies.clients.mandrill.model.MandrillRecipient;
 import com.cribbstechnologies.clients.mandrill.request.MandrillMessagesRequest;
 import com.cribbstechnologies.clients.mandrill.request.MandrillRESTRequest;
 import com.cribbstechnologies.clients.mandrill.util.MandrillConfiguration;
-import voterheads.Voterheads;
 
 public class MailManager
 {
@@ -54,8 +53,6 @@ public class MailManager
 
         client = new DefaultHttpClient();
         request.setHttpClient(client);
-        boolean emailSent;
-        emailSent = false;
         final MandrillMessageRequest mmr = new MandrillMessageRequest();
         final MandrillHtmlMessage message = new MandrillHtmlMessage();
         final Map<String, String> headers = new HashMap<String, String>();
@@ -89,20 +86,15 @@ public class MailManager
         try
         {
             messagesRequest.sendMessage(mmr);
-            emailSent = true;
         }
         catch (final RequestFailedException e)
         {
             e.printStackTrace();
-            emailSent = false;
+            // fail(e.getMessage());
         }
         finally
         {
-            if (emailSent)
-            {
-                logger.info("Message Sent");
-                Voterheads.incrementEmailsSent();
-            }
+            logger.info("Message Sent");
         }
 
     }

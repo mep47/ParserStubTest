@@ -132,18 +132,9 @@ public class WebCrawler
                         // fullUrlString + " format=" + urlFormat);
                         if (agendaFileFormatMatches(urlFormat, fullUrlString))
                         {
-
-                            if (fullUrlString.contains("\n"))
-                            {
-                                logger.info("Match Found: "
-                                        + fullUrlString
-                                                .substring(0, fullUrlString
-                                                        .lastIndexOf("\n")));
-                            }
-                            else
-                            {
-                                logger.info("Match Found: " + fullUrlString);
-                            }
+                            logger.info("Match Found: "
+                                    + fullUrlString.substring(0,
+                                            fullUrlString.lastIndexOf("\n")));
                             try
                             {
 
@@ -163,7 +154,6 @@ public class WebCrawler
                             // (iSuffix == filename.length() - 4)) {
                             knownURLs.put(fullUrlString, new Integer(1));
                             // newURLs.addElement(url);
-                            //logger.info("Mismatch: " + fullUrlString);
                             if (crawlLevel < CRAWL_LIMIT)
                             {
                                 if (robotSafe(url))
@@ -260,7 +250,7 @@ public class WebCrawler
                     {
 
                         // fullUrlString = protocol+"://"+host+"/"+newUrlString;
-                        fullUrlString = url.toString() + "\n";
+                        fullUrlString = url.toString();
                     }
                     else if (newUrlString.contains("./"))
                     {
@@ -368,8 +358,9 @@ public class WebCrawler
     }
 
     public String getpage(URL url)
-
     {
+    	int inputLength = 0;
+    	
         try
         {
             // try opening the URL
@@ -382,9 +373,11 @@ public class WebCrawler
             final InputStream urlStream = url.openStream();
             // search the input stream for links
             // first, read in the entire URL
-            final byte b[] = new byte[1000];
+			inputLength = urlStream.available();
+
+            final byte b[] = new byte[inputLength];
             int numRead = urlStream.read(b);
-            String content = new String(b, 0, numRead);
+            String content = new String(b);
             // while ((numRead != -1) && (content.length() < MAXSIZE)) {
             while ((numRead != -1))
             {
@@ -657,9 +650,8 @@ public class WebCrawler
         {
             System.out.println("Searching " + url.toString());
         }
-        /* Do not care if robot safe or not */
-        //if (robotSafe(url))
-        //{
+        if (robotSafe(url))
+        {
             final String page = getpage(url);
             if (DEBUG)
             {
@@ -670,7 +662,7 @@ public class WebCrawler
                 processpage(url, page);
             }
             // if (newURLs.isEmpty()) break;
-       // }
+        }
         // }
         // }
 
