@@ -93,7 +93,7 @@ public class OrgDownload
         catch (final Exception e)
         {
             // TODO Auto-generated catch block
-            logger.fatal(e.getStackTrace());
+            logger.fatal(e, e);
             downloadSuccessful = false;
         }
         finally
