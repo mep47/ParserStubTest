@@ -2,6 +2,7 @@ package voterheads;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -89,6 +90,10 @@ public class OrgDownload
             // orgs[i++] = o.getOrganization();
             // }
 
+        }
+        catch (final MalformedURLException me)
+        {
+        	logger.fatal("MalformedURLException organizationJSONLink="+organizationJSONLink , me);
         }
         catch (final Exception e)
         {
